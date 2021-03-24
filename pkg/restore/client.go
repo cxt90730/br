@@ -249,6 +249,19 @@ func (rc *Client) GetFilesInRawRange(startKey []byte, endKey []byte, cf string) 
 	return nil, errors.Annotate(berrors.ErrRestoreRangeMismatch, "no backup data in the range")
 }
 
+// GetFilesInTxnRange gets all files that are in the given range or intersects with the given range.
+func (rc *Client) GetFilesInTxnRange() ([]*backup.File, error) {
+	if rc.IsRawKvMode() {
+		return nil, errors.Annotate(berrors.ErrRestoreModeMismatch, "the backup data is not in raw kv mode")
+	}
+
+	files := make([]*backup.File, 0)
+	files = append(files, rc.backupMeta.Files...)
+
+	// There should be at most one backed up range that covers the restoring range.
+	return files, nil
+}
+
 // SetConcurrency sets the concurrency of dbs tables files.
 func (rc *Client) SetConcurrency(c uint) {
 	rc.workerPool = utils.NewWorkerPool(c, "file")
@@ -615,6 +628,41 @@ func (rc *Client) RestoreRaw(
 		"finish to restore raw range",
 		logutil.Key("startKey", startKey),
 		logutil.Key("endKey", endKey),
+	)
+	return nil
+}
+
+// RestoreTxn tries to restore txn keys in the specified range.
+func (rc *Client) RestoreTxn(
+	ctx context.Context, files []*backup.File, updateCh glue.Progress,
+) error {
+	start := time.Now()
+	defer func() {
+		elapsed := time.Since(start)
+		log.Info("Restore Txn",
+			zap.Duration("take", elapsed))
+	}()
+	errCh := make(chan error, len(files))
+	eg, ectx := errgroup.WithContext(ctx)
+	defer close(errCh)
+
+	for _, file := range files {
+		fileReplica := file
+		rc.workerPool.ApplyOnErrorGroup(eg,
+			func() error {
+				defer updateCh.Inc()
+				return rc.fileImporter.Import(ectx, fileReplica, nil)
+			})
+	}
+	if err := eg.Wait(); err != nil {
+		log.Error(
+			"restore txn range failed",
+			zap.Error(err),
+		)
+		return errors.Trace(err)
+	}
+	log.Info(
+		"finish to restore txn range",
 	)
 	return nil
 }

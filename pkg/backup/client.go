@@ -6,7 +6,11 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
+	"io/ioutil"
+	"net"
+	"net/http"
 	"sync"
 	"time"
 
@@ -263,6 +267,7 @@ func BuildBackupRangeAndSchema(
 	backupSchemas := newBackupSchemas()
 	for _, dbInfo := range info.AllSchemas() {
 		// skip system databases
+		fmt.Println("4 client.go for info.AllSchemas()", "database:", dbInfo.Name.L, "dbId:", dbInfo.ID, len(dbInfo.Tables))
 		if util.IsMemOrSysDB(dbInfo.Name.L) {
 			continue
 		}
@@ -278,6 +283,8 @@ func BuildBackupRangeAndSchema(
 			continue
 		}
 		for _, tableInfo := range dbInfo.Tables {
+			fmt.Println("4 client.go tableFilter.MatchTable(dbInfo.Name.O, tableInfo.Name.O)",
+				dbInfo.Name.O, tableInfo.Name.O, tableFilter.MatchTable(dbInfo.Name.O, tableInfo.Name.O))
 			if !tableFilter.MatchTable(dbInfo.Name.O, tableInfo.Name.O) {
 				// Skip tables other than the given table.
 				continue
@@ -325,7 +332,6 @@ func BuildBackupRangeAndSchema(
 				}
 			}
 			tableInfo.Indices = tableInfo.Indices[:n]
-
 			if dbData == nil {
 				dbData, err = json.Marshal(dbInfo)
 				if err != nil {
@@ -362,6 +368,8 @@ func BuildBackupRangeAndSchema(
 				return nil, nil, errors.Trace(err)
 			}
 			for _, r := range tableRanges {
+				fmt.Println("5 for tableRanges", r.StartKey.String(), r.EndKey.String(),
+					string(r.StartKey), string(r.EndKey))
 				ranges = append(ranges, rtree.Range{
 					StartKey: r.StartKey,
 					EndKey:   r.EndKey,
@@ -526,7 +534,6 @@ func (bc *Client) BackupRange(
 		return nil, errors.Trace(err)
 	}
 	log.Info("finish backup push down", zap.Int("Ok", results.Len()))
-
 	// Find and backup remaining ranges.
 	// TODO: test fine grained backup.
 	err = bc.fineGrainedBackup(
@@ -1021,4 +1028,72 @@ func FilterSchema(backupMeta *kvproto.BackupMeta) error {
 // isRetryableError represents whether we should retry reset grpc connection.
 func isRetryableError(err error) bool {
 	return status.Code(err) == codes.Unavailable || status.Code(err) == codes.Canceled
+}
+
+// Leader represents region leader info
+type Leader struct {
+	ID      int `json:"id"`
+	StoreID int `json:"store_id"`
+}
+
+// Region represents info of unique region
+type Region struct {
+	ID              int    `json:"id"`
+	StartKey        string `json:"start_key"`
+	EndKey          string `json:"end_key"`
+	Leader          Leader `json:"leader"`
+	ApproximateKeys int    `json:"approximate_keys"`
+}
+
+// RegionResponse represents of all regions
+type RegionResponse struct {
+	Count   int      `json:"count"`
+	Regions []Region `json:"regions"`
+}
+
+// FetchRegions will fetch all tikv regions
+func FetchRegions(pds []string) (regions []Region, err error) {
+	httpClient := http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConnsPerHost: 1,
+			DialContext: (&net.Dialer{
+				Timeout: 3 * time.Second,
+			}).DialContext,
+			TLSHandshakeTimeout: 10 * time.Second,
+		},
+	}
+	var result RegionResponse
+	for _, pdAddress := range pds {
+		err = func(pd string) error {
+			url := fmt.Sprintf("http://%s/pd/api/v1/regions", pd)
+			req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+			resp, httpErr := httpClient.Do(req)
+			if httpErr != nil {
+				return fmt.Errorf("get pd info err: %w", httpErr)
+			}
+			defer resp.Body.Close()
+			return ReadJSONBody(resp.Body, &result)
+		}(pdAddress)
+		if err != nil {
+			continue
+		}
+		return result.Regions, nil
+	}
+	return nil, fmt.Errorf("no pd available: %w", err)
+}
+
+// ReadJSONBody read from ReadCloser and unmarshal to out;
+// `out` should be of POINTER type
+func ReadJSONBody(body io.ReadCloser, out interface{}) error {
+	jsonBytes, err := ioutil.ReadAll(body)
+	if err != nil {
+		return fmt.Errorf("read body err: %w", err)
+	}
+	// fmt.Println("json body:", string(jsonBytes))
+	err = json.Unmarshal(jsonBytes, out)
+	if err != nil {
+		return fmt.Errorf("can not unmarshal json body. err: %w", err)
+	}
+	return nil
 }

@@ -4,9 +4,13 @@ package task
 
 import (
 	"context"
+	"encoding/hex"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/pingcap/br/pkg/rtree"
 
 	"github.com/pingcap/br/pkg/utils"
 
@@ -180,6 +184,19 @@ func (cfg *BackupConfig) adjustBackupConfig() {
 	}
 }
 
+const (
+	// CmdFullBackup means full backup command name
+	CmdFullBackup = "Full backup"
+	// CmdDBBackup means full backup command name
+	CmdDBBackup = "Database backup"
+	// CmdTableBackup means table backup command name
+	CmdTableBackup = "Table backup"
+	// CmdRawBackup means raw backup command name
+	CmdRawBackup = "Raw backup"
+	// CmdTxnBackup means txn backup command name
+	CmdTxnBackup = "Txn backup"
+)
+
 // RunBackup starts a backup task inside the current goroutine.
 func RunBackup(c context.Context, g glue.Glue, cmdName string, cfg *BackupConfig) error {
 	cfg.adjustBackupConfig()
@@ -187,7 +204,7 @@ func RunBackup(c context.Context, g glue.Glue, cmdName string, cfg *BackupConfig
 	defer summary.Summary(cmdName)
 	ctx, cancel := context.WithCancel(c)
 	defer cancel()
-
+	// backend data location
 	u, err := storage.ParseBackend(cfg.Storage, &cfg.BackendOptions)
 	if err != nil {
 		return errors.Trace(err)
@@ -211,6 +228,7 @@ func RunBackup(c context.Context, g glue.Glue, cmdName string, cfg *BackupConfig
 	}
 	client.SetGCTTL(cfg.GCTTL)
 
+	// Get Backup ts
 	backupTS, err := client.GetTS(ctx, cfg.TimeAgo, cfg.BackupTS)
 	if err != nil {
 		return errors.Trace(err)
@@ -221,6 +239,7 @@ func RunBackup(c context.Context, g glue.Glue, cmdName string, cfg *BackupConfig
 		TTL:      client.GetGCTTL(),
 		ID:       utils.MakeSafePointID(),
 	}
+
 	// use lastBackupTS as safePoint if exists
 	if cfg.LastBackupTS > 0 {
 		sp.BackupTS = cfg.LastBackupTS
@@ -228,8 +247,9 @@ func RunBackup(c context.Context, g glue.Glue, cmdName string, cfg *BackupConfig
 
 	log.Info("current backup safePoint job",
 		zap.Object("safePoint", sp))
-	utils.StartServiceSafePointKeeper(ctx, mgr.GetPDClient(), sp)
 
+	// update gc and safe point in daemon
+	utils.StartServiceSafePointKeeper(ctx, mgr.GetPDClient(), sp)
 	isIncrementalBackup := cfg.LastBackupTS > 0
 
 	if cfg.RemoveSchedulers {
@@ -258,10 +278,41 @@ func RunBackup(c context.Context, g glue.Glue, cmdName string, cfg *BackupConfig
 		CompressionLevel: cfg.CompressionLevel,
 	}
 
-	ranges, backupSchemas, err := backup.BuildBackupRangeAndSchema(
-		mgr.GetDomain(), mgr.GetTiKV(), cfg.TableFilter, backupTS, cfg.IgnoreStats)
-	if err != nil {
-		return errors.Trace(err)
+	var (
+		ranges        []rtree.Range
+		backupSchemas *backup.Schemas
+	)
+
+	if cmdName == CmdTxnBackup {
+		// TODO: fetch region info by pd client library
+		regions, fetchErr := backup.FetchRegions(cfg.PD)
+		if fetchErr != nil {
+			return errors.Trace(fetchErr)
+		}
+		for _, r := range regions {
+			startKey, err := hex.DecodeString(r.StartKey)
+			if err != nil {
+				return errors.Trace(
+					fmt.Errorf("bad region key: %s", r.StartKey))
+			}
+			endKey, err := hex.DecodeString(r.EndKey)
+			if err != nil {
+				return errors.Trace(
+					fmt.Errorf("bad region key: %s", r.EndKey))
+			}
+
+			ranges = append(ranges, rtree.Range{
+				StartKey: startKey,
+				EndKey:   endKey,
+			})
+		}
+	} else {
+		// get all tables ranges
+		ranges, backupSchemas, err = backup.BuildBackupRangeAndSchema(
+			mgr.GetDomain(), mgr.GetTiKV(), cfg.TableFilter, backupTS, cfg.IgnoreStats)
+		if err != nil {
+			return errors.Trace(err)
+		}
 	}
 	// nothing to backup
 	if ranges == nil {
@@ -302,7 +353,6 @@ func RunBackup(c context.Context, g glue.Glue, cmdName string, cfg *BackupConfig
 		}
 		approximateRegions += regionCount
 	}
-
 	summary.CollectInt("backup total regions", approximateRegions)
 
 	// Backup
@@ -310,6 +360,7 @@ func RunBackup(c context.Context, g glue.Glue, cmdName string, cfg *BackupConfig
 	updateCh := g.StartProgress(
 		ctx, cmdName, int64(approximateRegions), !cfg.LogProgress)
 
+	// begin backup
 	files, err := client.BackupRanges(ctx, ranges, req, uint(cfg.Concurrency), updateCh)
 	if err != nil {
 		return errors.Trace(err)
@@ -323,7 +374,7 @@ func RunBackup(c context.Context, g glue.Glue, cmdName string, cfg *BackupConfig
 	}
 
 	// Checksum from server, and then fulfill the backup metadata.
-	if cfg.Checksum && !isIncrementalBackup {
+	if cfg.Checksum && !isIncrementalBackup && backupSchemas != nil {
 		backupSchemasConcurrency := utils.MinInt(backup.DefaultSchemaConcurrency, backupSchemas.Len())
 		updateCh = g.StartProgress(
 			ctx, "Checksum", int64(backupSchemas.Len()), !cfg.LogProgress)
@@ -342,7 +393,9 @@ func RunBackup(c context.Context, g glue.Glue, cmdName string, cfg *BackupConfig
 		}
 	} else {
 		// Just... copy schemas from origin.
-		backupMeta.Schemas = backupSchemas.CopyMeta()
+		if backupSchemas != nil {
+			backupMeta.Schemas = backupSchemas.CopyMeta()
+		}
 		if isIncrementalBackup {
 			// Since we don't support checksum for incremental data, fast checksum should be skipped.
 			log.Info("Skip fast checksum in incremental backup")

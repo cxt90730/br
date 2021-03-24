@@ -92,7 +92,6 @@ func (push *pushDown) pushBackup(
 				// None error means range has been backuped successfully.
 				res.Put(
 					resp.GetStartKey(), resp.GetEndKey(), resp.GetFiles())
-
 				// Update progress
 				updateCh.Inc()
 			} else {

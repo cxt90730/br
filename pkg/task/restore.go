@@ -182,7 +182,7 @@ func RunRestore(c context.Context, g glue.Glue, cmdName string, cfg *RestoreConf
 	}
 
 	// nothing to restore, maybe only ddl changes in incremental restore
-	if len(dbs) == 0 && len(tables) == 0 {
+	if len(dbs) == 0 && len(tables) == 0 && !client.IsSkipCreateSQL() {
 		log.Info("nothing to restore, all databases and tables are filtered out")
 		// even nothing to restore, we show a success message since there is no failure.
 		summary.SetSuccessStatus(true)

@@ -9,6 +9,8 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
+	"github.com/pingcap/br/pkg/glue"
+
 	"github.com/pingcap/br/pkg/gluetikv"
 	"github.com/pingcap/br/pkg/summary"
 	"github.com/pingcap/br/pkg/task"
@@ -21,7 +23,13 @@ func runRestoreCommand(command *cobra.Command, cmdName string) error {
 		command.SilenceUsage = false
 		return errors.Trace(err)
 	}
-	if err := task.RunRestore(GetDefaultContext(), tidbGlue, cmdName, &cfg); err != nil {
+	var gl glue.Glue
+	if cmdName == "Txn restore" {
+		gl = gluetikv.Glue{}
+	} else {
+		gl = tidbGlue
+	}
+	if err := task.RunRestore(GetDefaultContext(), gl, cmdName, &cfg); err != nil {
 		log.Error("failed to restore", zap.Error(err))
 		return errors.Trace(err)
 	}
@@ -56,6 +64,19 @@ func runRestoreRawCommand(command *cobra.Command, cmdName string) error {
 	return nil
 }
 
+func runRestoreTxnCommand(command *cobra.Command, cmdName string) error {
+	cfg := task.RestoreConfig{Config: task.Config{LogProgress: HasLogFile()}}
+	if err := cfg.ParseFromFlags(command.Flags()); err != nil {
+		command.SilenceUsage = false
+		return errors.Trace(err)
+	}
+	if err := task.RunRestoreTxn(GetDefaultContext(), gluetikv.Glue{}, cmdName, &cfg); err != nil {
+		log.Error("failed to restore raw kv", zap.Error(err))
+		return errors.Trace(err)
+	}
+	return nil
+}
+
 // NewRestoreCommand returns a restore subcommand.
 func NewRestoreCommand() *cobra.Command {
 	command := &cobra.Command{
@@ -80,6 +101,7 @@ func NewRestoreCommand() *cobra.Command {
 		newTableRestoreCommand(),
 		newLogRestoreCommand(),
 		newRawRestoreCommand(),
+		newTxnRestoreCommand(),
 	)
 	task.DefineRestoreFlags(command.PersistentFlags())
 
@@ -146,6 +168,20 @@ func newRawRestoreCommand() *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runRestoreRawCommand(cmd, "Raw restore")
+		},
+	}
+
+	task.DefineRawRestoreFlags(command)
+	return command
+}
+
+func newTxnRestoreCommand() *cobra.Command {
+	command := &cobra.Command{
+		Use:   "txn",
+		Short: "restore txnkv to TiKV cluster",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runRestoreTxnCommand(cmd, "Txn restore")
 		},
 	}
 

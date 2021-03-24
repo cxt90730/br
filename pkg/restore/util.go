@@ -277,14 +277,16 @@ func validateAndGetFileRange(file *backup.File, rules *RewriteRules) (rtree.Rang
 	if err != nil {
 		return rtree.Range{}, errors.Trace(err)
 	}
-	startID := tablecodec.DecodeTableID(file.GetStartKey())
-	endID := tablecodec.DecodeTableID(file.GetEndKey())
-	if startID != endID {
-		log.Error("table ids mismatch",
-			zap.Int64("startID", startID),
-			zap.Int64("endID", endID),
-			logutil.File(file))
-		return rtree.Range{}, errors.Annotate(berrors.ErrRestoreTableIDMismatch, "validateAndGetFileRange")
+	if rules != nil {
+		startID := tablecodec.DecodeTableID(file.GetStartKey())
+		endID := tablecodec.DecodeTableID(file.GetEndKey())
+		if startID != endID {
+			log.Error("table ids mismatch",
+				zap.Int64("startID", startID),
+				zap.Int64("endID", endID),
+				logutil.File(file))
+			return rtree.Range{}, errors.Annotate(berrors.ErrRestoreTableIDMismatch, "validateAndGetFileRange")
+		}
 	}
 	r := rtree.Range{StartKey: file.GetStartKey(), EndKey: file.GetEndKey()}
 	return r, nil

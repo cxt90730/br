@@ -54,6 +54,7 @@ func NewBackupCommand() *cobra.Command {
 		Short:        "backup a TiDB/TiKV cluster",
 		SilenceUsage: true,
 		PersistentPreRunE: func(c *cobra.Command, args []string) error {
+			// Init logger, result summary, redact log and so on
 			if err := Init(c); err != nil {
 				return errors.Trace(err)
 			}
@@ -69,6 +70,7 @@ func NewBackupCommand() *cobra.Command {
 	}
 	command.AddCommand(
 		newFullBackupCommand(),
+		newTxnBackupCommand(),
 		newDBBackupCommand(),
 		newTableBackupCommand(),
 		newRawBackupCommand(),
@@ -88,7 +90,23 @@ func newFullBackupCommand() *cobra.Command {
 		Args: cobra.NoArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
 			// empty db/table means full backup.
-			return runBackupCommand(command, "Full backup")
+			return runBackupCommand(command, task.CmdFullBackup)
+		},
+	}
+	task.DefineFilterFlags(command)
+	return command
+}
+
+func newTxnBackupCommand() *cobra.Command {
+	command := &cobra.Command{
+		Use:   "txn",
+		Short: "backup all txnkv",
+		// prevents incorrect usage like `--checksum false` instead of `--checksum=false`.
+		// the former, according to pflag parsing rules, means `--checksum=true false`.
+		Args: cobra.NoArgs,
+		RunE: func(command *cobra.Command, _ []string) error {
+			// empty db/table means full backup.
+			return runBackupCommand(command, task.CmdTxnBackup)
 		},
 	}
 	task.DefineFilterFlags(command)
@@ -102,7 +120,7 @@ func newDBBackupCommand() *cobra.Command {
 		Short: "backup a database",
 		Args:  cobra.NoArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
-			return runBackupCommand(command, "Database backup")
+			return runBackupCommand(command, task.CmdDBBackup)
 		},
 	}
 	task.DefineDatabaseFlags(command)
@@ -116,7 +134,7 @@ func newTableBackupCommand() *cobra.Command {
 		Short: "backup a table",
 		Args:  cobra.NoArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
-			return runBackupCommand(command, "Table backup")
+			return runBackupCommand(command, task.CmdTableBackup)
 		},
 	}
 	task.DefineTableFlags(command)
@@ -131,7 +149,7 @@ func newRawBackupCommand() *cobra.Command {
 		Short: "(experimental) backup a raw kv range from TiKV cluster",
 		Args:  cobra.NoArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
-			return runBackupRawCommand(command, "Raw backup")
+			return runBackupRawCommand(command, task.CmdRawBackup)
 		},
 	}
 

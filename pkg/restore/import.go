@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"fmt"
 	"sync"
 	"time"
 
@@ -205,7 +206,7 @@ func (importer *FileImporter) Import(
 	// Rewrite the start key and end key of file to scan regions
 	var startKey, endKey []byte
 	var err error
-	if importer.isRawKvMode {
+	if importer.isRawKvMode || rewriteRules == nil {
 		startKey = file.StartKey
 		endKey = file.EndKey
 	} else {
@@ -238,8 +239,8 @@ func (importer *FileImporter) Import(
 			var downloadMeta *import_sstpb.SSTMeta
 			errDownload := utils.WithRetry(ctx, func() error {
 				var e error
-				if importer.isRawKvMode {
-					downloadMeta, e = importer.downloadRawKVSST(ctx, info, file)
+				if importer.isRawKvMode || rewriteRules == nil {
+					downloadMeta, e = importer.downloadRawKVSST(ctx, info, file, rewriteRules)
 				} else {
 					downloadMeta, e = importer.downloadSST(ctx, info, file, rewriteRules)
 				}
@@ -359,7 +360,10 @@ func (importer *FileImporter) downloadSST(
 	// Assume one region reflects to one rewrite rule
 	_, key, err := codec.DecodeBytes(regionInfo.Region.GetStartKey())
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, errors.Trace(fmt.Errorf("err: %w. key: %s", err, string(regionInfo.Region.GetStartKey())))
+	}
+	if rewriteRules == nil {
+		rewriteRules = EmptyRewriteRule()
 	}
 	regionRule := matchNewPrefix(key, rewriteRules)
 	if regionRule == nil {
@@ -404,13 +408,13 @@ func (importer *FileImporter) downloadRawKVSST(
 	ctx context.Context,
 	regionInfo *RegionInfo,
 	file *backup.File,
+	rewriteRules *RewriteRules,
 ) (*import_sstpb.SSTMeta, error) {
 	uid := uuid.New()
 	id := uid[:]
 	// Empty rule
 	var rule import_sstpb.RewriteRule
 	sstMeta := GetSSTMetaFromFile(id, file, regionInfo.Region, &rule)
-
 	// Cut the SST file's range to fit in the restoring range.
 	if bytes.Compare(importer.rawStartKey, sstMeta.Range.GetStart()) > 0 {
 		sstMeta.Range.Start = importer.rawStartKey
@@ -429,7 +433,7 @@ func (importer *FileImporter) downloadRawKVSST(
 		StorageBackend: importer.backend,
 		Name:           file.GetName(),
 		RewriteRule:    rule,
-		IsRawKv:        true,
+		IsRawKv:        rewriteRules != nil,
 	}
 	log.Debug("download SST", logutil.SSTMeta(&sstMeta), logutil.Region(regionInfo.Region))
 	var err error
