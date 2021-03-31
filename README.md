@@ -83,6 +83,31 @@ bin/br restore full --pd pd0:2379 --storage "s3://mybucket/full" \
     --s3.endpoint="$S3_ENDPOINT"
 ```
 
+## Backup all TxnKV (experimental)
+
+```shell
+
+## Backup
+
+./br backup txn \
+	--pd "${PDIP}:2379" \
+	-s "${STORAGE_PATH}" \
+	--s3.endpoint "${S3_ENDPOINT}" \
+	--send-credentials-to-tikv=true \
+	--log-file ${LOG_PATH}
+
+## Restore
+
+./br restore txn \
+    --pd "${PDIP}:2379" \
+    -s "${RESTORE}" \
+    --no-schema \
+    --s3.endpoint "${S3_ENDPOINT}" \
+    --send-credentials-to-tikv=true \
+    --log-file ${LOG_PATH}
+
+```
+
 ## Contributing
 
 Contributions are welcomed and greatly appreciated. See [CONTRIBUTING](./CONTRIBUTING.md)
