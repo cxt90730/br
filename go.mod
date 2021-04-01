@@ -1,4 +1,4 @@
-module github.com/cxt90730/br
+module github.com/pingcap/br
 
 go 1.13
 
