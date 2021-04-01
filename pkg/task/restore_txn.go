@@ -2,13 +2,15 @@ package task
 
 import (
 	"context"
+
+	"github.com/pingcap/errors"
+	"github.com/pingcap/log"
+
 	berrors "github.com/pingcap/br/pkg/errors"
 	"github.com/pingcap/br/pkg/glue"
 	"github.com/pingcap/br/pkg/restore"
 	"github.com/pingcap/br/pkg/summary"
 	"github.com/pingcap/br/pkg/utils"
-	"github.com/pingcap/errors"
-	"github.com/pingcap/log"
 )
 
 // RunRestoreTxn starts a raw kv restore task inside the current goroutine.
@@ -66,7 +68,6 @@ func RunRestoreTxn(c context.Context, g glue.Glue, cmdName string, cfg *RestoreC
 	summary.CollectInt("restore files", len(files))
 
 	ranges, err := restore.ValidateFileRanges(files, nil)
-
 	if err != nil {
 		return errors.Trace(err)
 	}
@@ -103,4 +104,3 @@ func RunRestoreTxn(c context.Context, g glue.Glue, cmdName string, cfg *RestoreC
 	summary.SetSuccessStatus(true)
 	return nil
 }
-

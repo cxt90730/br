@@ -81,7 +81,8 @@ func (rs *RegionSplitter) Split(
 
 	// Handle empty end key.
 	if len(sortedRanges[len(sortedRanges)-1].EndKey) == 0 {
-		sortedRanges[len(sortedRanges)-1].EndKey = append(sortedRanges[len(sortedRanges)-1].StartKey, 0x00)
+		sortedRanges[len(sortedRanges)-1].EndKey = sortedRanges[len(sortedRanges)-1].StartKey
+		sortedRanges[len(sortedRanges)-1].EndKey = append(sortedRanges[len(sortedRanges)-1].EndKey, 0x00)
 	}
 	minKey := codec.EncodeBytes([]byte{}, sortedRanges[0].StartKey)
 	maxKey := codec.EncodeBytes([]byte{}, sortedRanges[len(sortedRanges)-1].EndKey)
