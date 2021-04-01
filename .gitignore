@@ -11,5 +11,3 @@ docker/data/
 docker/logs/
 *.swp
 .DS_Store
-go.mod
-go.sum
