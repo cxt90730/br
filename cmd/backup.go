@@ -7,6 +7,7 @@ import (
 	"github.com/pingcap/log"
 	"github.com/pingcap/tidb/ddl"
 	"github.com/pingcap/tidb/session"
+	"github.com/robfig/cron/v3"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -27,6 +28,22 @@ func runBackupCommand(command *cobra.Command, cmdName string) error {
 		session.DisableStats4Test()
 	}
 
+	if cfg.Cron != "" {
+		cr := cron.New(cron.WithSeconds())
+		_, err := cr.AddFunc(cfg.Cron, func() {
+			if err := task.RunBackup(GetDefaultContext(), tidbGlue, cmdName, &cfg); err != nil {
+				log.Error("failed to backup", zap.Error(err))
+				panic(err)
+			}
+			select {
+				// block
+			}
+		})
+		if err != nil {
+			log.Error("failed to set cron job", zap.Error(err))
+			return errors.Trace(err)
+		}
+	}
 	if err := task.RunBackup(GetDefaultContext(), tidbGlue, cmdName, &cfg); err != nil {
 		log.Error("failed to backup", zap.Error(err))
 		return errors.Trace(err)

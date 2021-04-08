@@ -35,6 +35,7 @@ import (
 const (
 	flagBackupTimeago    = "timeago"
 	flagBackupTS         = "backupts"
+	flagCron			 = "cron"
 	flagLastBackupTS     = "lastbackupts"
 	flagCompressionType  = "compression"
 	flagCompressionLevel = "compression-level"
@@ -60,6 +61,7 @@ type BackupConfig struct {
 	TimeAgo          time.Duration `json:"time-ago" toml:"time-ago"`
 	BackupTS         uint64        `json:"backup-ts" toml:"backup-ts"`
 	LastBackupTS     uint64        `json:"last-backup-ts" toml:"last-backup-ts"`
+	Cron             string        `json:"cron" toml:"cron"`
 	GCTTL            int64         `json:"gc-ttl" toml:"gc-ttl"`
 	RemoveSchedulers bool          `json:"remove-schedulers" toml:"remove-schedulers"`
 	IgnoreStats      bool          `json:"ignore-stats" toml:"ignore-stats"`
@@ -77,6 +79,7 @@ func DefineBackupFlags(flags *pflag.FlagSet) {
 		" use for incremental backup, support TSO only")
 	flags.String(flagBackupTS, "", "the backup ts support TSO or datetime,"+
 		" e.g. '400036290571534337', '2018-05-11 01:42:23'")
+	flags.String(flagCron, "", "the backup can be run with cron job.")
 	flags.Int64(flagGCTTL, utils.DefaultBRGCSafePointTTL, "the TTL (in seconds) that PD holds for BR's GC safepoint")
 	flags.String(flagCompressionType, "zstd",
 		"backup sst file compression algorithm, value can be one of 'lz4|zstd|snappy'")

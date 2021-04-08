@@ -1,14 +1,53 @@
-module github.com/pingcap/br/_tools
+module github.com/pingcap/br
 
 go 1.13
 
 require (
-	github.com/dnephin/govet v0.0.0-20171012192244-4a96d43e39d3
-	github.com/go-playground/overalls v0.0.0-20191218162659-7df9f728c018
-	github.com/golangci/golangci-lint v1.33.0
-	github.com/mgechev/revive v1.0.2
+	cloud.google.com/go/storage v1.6.0
+	github.com/HdrHistogram/hdrhistogram-go v0.9.0 // indirect
+	github.com/aws/aws-sdk-go v1.35.3
+	github.com/cheggaaa/pb/v3 v3.0.4
+	github.com/codahale/hdrhistogram v0.9.0 // indirect
+	github.com/coreos/go-semver v0.3.0
+	github.com/fsouza/fake-gcs-server v1.19.0
+	github.com/go-sql-driver/mysql v1.5.0
+	github.com/gogo/protobuf v1.3.1
+	github.com/golang/mock v1.4.4
+	github.com/golang/snappy v0.0.2-0.20190904063534-ff6b7dc882cf // indirect
+	github.com/google/btree v1.0.0
+	github.com/google/go-cmp v0.5.2 // indirect
+	github.com/google/uuid v1.1.1
+	github.com/kr/text v0.2.0 // indirect
+	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
+	github.com/pingcap/check v0.0.0-20200212061837-5e12011dc712
 	github.com/pingcap/errors v0.11.5-0.20201126102027-b0a155152ca3
 	github.com/pingcap/failpoint v0.0.0-20200702092429-9f69995143ce
-	github.com/yookoala/realpath v1.0.0 // indirect
-	mvdan.cc/gofumpt v0.0.0-20201123090407-3077abae40c0
+	github.com/pingcap/kvproto v0.0.0-20201126113434-70db5fb4b0dc
+	github.com/pingcap/log v0.0.0-20201112100606-8f1e84a3abc8
+	github.com/pingcap/parser v0.0.0-20201214100800-9fb44a0518a2
+	github.com/pingcap/tidb v1.1.0-beta.0.20201214152324-ce2f365189d3
+	github.com/pingcap/tidb-tools v4.0.9-0.20201127090955-2707c97b3853+incompatible
+	github.com/pingcap/tipb v0.0.0-20200618092958-4fad48b4c8c3
+	github.com/prometheus/client_golang v1.5.1
+	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
+	github.com/robfig/cron/v3 v3.0.1
+	github.com/sirupsen/logrus v1.6.0
+	github.com/spf13/cobra v1.0.0
+	github.com/spf13/pflag v1.0.5
+	github.com/stretchr/testify v1.6.1 // indirect
+	github.com/tikv/pd v1.1.0-beta.0.20201209075645-beb7635d13d2
+	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
+	go.etcd.io/etcd v0.5.0-alpha.5.0.20200824191128-ae9734ed278b
+	go.uber.org/multierr v1.6.0
+	go.uber.org/zap v1.16.0
+	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a // indirect
+	golang.org/x/exp v0.0.0-20200513190911-00229845015e // indirect
+	golang.org/x/net v0.0.0-20200904194848-62affa334b73 // indirect
+	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
+	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
+	google.golang.org/api v0.22.0
+	google.golang.org/grpc v1.27.1
+	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b // indirect
 )
+
+replace cloud.google.com/go/storage => github.com/3pointer/google-cloud-go/storage v1.6.1-0.20210108125931-b59bfa0720b2
