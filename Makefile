@@ -12,6 +12,11 @@ LDFLAGS += -X "$(BR_PKG)/pkg/utils.BRBuildTS=$(shell date -u '+%Y-%m-%d %I:%M:%S
 LDFLAGS += -X "$(BR_PKG)/pkg/utils.BRGitHash=$(shell git rev-parse HEAD)"
 LDFLAGS += -X "$(BR_PKG)/pkg/utils.BRGitBranch=$(shell git rev-parse --abbrev-ref HEAD)"
 
+REPO = br
+VER = $(shell git describe --tags)
+REL = $(shell git rev-parse --abbrev-ref HEAD)-$(shell git rev-parse HEAD)
+BUILDROOT = rpm-build
+
 GOBUILD := GOOS=linux GOARCH=amd64 CGO_ENABLED=0 GO111MODULE=on go build -trimpath -ldflags '$(LDFLAGS)'
 #GOBUILD := CGO_ENABLED=0 GO111MODULE=on go build -trimpath -ldflags '$(LDFLAGS)'
 GOTEST  := CGO_ENABLED=1 GO111MODULE=on go test -ldflags '$(LDFLAGS)'
@@ -162,3 +167,8 @@ failpoint-disable: tools
 	tools/bin/failpoint-ctl disable
 
 .PHONY: tools
+
+.PHONY: package
+
+package:
+	package/rpmbuild.sh $(REPO) $(BUILDROOT) $(VER) $(REL)

@@ -13,3 +13,4 @@ docker/logs/
 .DS_Store
 go.mod
 go.sum
+rpm-build/

@@ -1,0 +1,11 @@
+compress
+/var/log/br/br-backup.log {
+    daily
+    rotate 30
+    missingok
+    compress
+    minsize 100k
+    postrotate
+    	ps -ef|grep yig$|awk '{print $2}'|xargs kill -SIGUSR1
+    endscript
+}
