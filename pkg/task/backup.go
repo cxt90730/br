@@ -35,7 +35,7 @@ import (
 const (
 	flagBackupTimeago    = "timeago"
 	flagBackupTS         = "backupts"
-	flagCron			 = "cron"
+	flagCron             = "cron"
 	flagLastBackupTS     = "lastbackupts"
 	flagCompressionType  = "compression"
 	flagCompressionLevel = "compression-level"
@@ -111,6 +111,10 @@ func (cfg *BackupConfig) ParseFromFlags(flags *pflag.FlagSet) error {
 	}
 	cfg.TimeAgo = timeAgo
 	cfg.LastBackupTS, err = flags.GetUint64(flagLastBackupTS)
+	if err != nil {
+		return errors.Trace(err)
+	}
+	cfg.Cron, err = flags.GetString(flagCron)
 	if err != nil {
 		return errors.Trace(err)
 	}
@@ -212,11 +216,14 @@ func RunBackup(c context.Context, g glue.Glue, cmdName string, cfg *BackupConfig
 	if err != nil {
 		return errors.Trace(err)
 	}
+
 	mgr, err := NewMgr(ctx, g, cfg.PD, cfg.TLS, GetKeepalive(&cfg.Config), cfg.CheckRequirements)
 	if err != nil {
 		return errors.Trace(err)
 	}
-	defer mgr.Close()
+	if cmdName == CmdTxnBackup {
+		mgr.DisableCloseDomain()
+	}
 
 	client, err := backup.NewBackupClient(ctx, mgr)
 	if err != nil {

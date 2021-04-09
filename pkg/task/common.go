@@ -360,7 +360,6 @@ func NewMgr(ctx context.Context,
 	if err != nil {
 		return nil, errors.Trace(err)
 	}
-
 	// Is it necessary to remove `StoreBehavior`?
 	return conn.NewMgr(ctx, g,
 		pdAddress, store.(tikv.Storage),

@@ -67,6 +67,25 @@ func (Glue) GetDomain(store kv.Storage) (*domain.Domain, error) {
 	return dom, nil
 }
 
+// SetNewDomain set new storage domain
+func SetNewDomain(store kv.Storage) (*domain.Domain, error) {
+	se, err := session.CreateSession(store)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+	dom, err := session.GetDomain(store)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+
+	// create stats handler for backup and restore.
+	err = dom.UpdateTableStatsLoop(se)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+	return dom, nil
+}
+
 // CreateSession implements glue.Glue.
 func (Glue) CreateSession(store kv.Storage) (glue.Session, error) {
 	se, err := session.CreateSession(store)

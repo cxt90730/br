@@ -3,6 +3,14 @@
 package cmd
 
 import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/pingcap/br/pkg/storage"
+
+	"github.com/pingcap/br/pkg/gluetidb"
+
 	"github.com/pingcap/errors"
 	"github.com/pingcap/log"
 	"github.com/pingcap/tidb/ddl"
@@ -31,19 +39,42 @@ func runBackupCommand(command *cobra.Command, cmdName string) error {
 	if cfg.Cron != "" {
 		cr := cron.New(cron.WithSeconds())
 		_, err := cr.AddFunc(cfg.Cron, func() {
-			if err := task.RunBackup(GetDefaultContext(), tidbGlue, cmdName, &cfg); err != nil {
-				log.Error("failed to backup", zap.Error(err))
+			ctx := context.TODO()
+			cfg = task.BackupConfig{Config: task.Config{LogProgress: HasLogFile()}}
+			if err := cfg.ParseFromFlags(command.Flags()); err != nil {
+				command.SilenceUsage = false
 				panic(err)
 			}
-			select {
-				// block
+			if cfg.IgnoreStats {
+				// Do not run stat worker in BR.
+				session.DisableStats4Test()
+			}
+			u, err := storage.ParseRawURL(cfg.Storage)
+			if err != nil {
+				panic(err)
+			}
+			prefix := time.Now().Format("20060102150405")
+			cfg.Storage = u.Scheme + "://" + u.Host + "/" + prefix
+			fmt.Println("Storage path:", cfg.Storage)
+			summary.InitCollector(HasLogFile())
+			if err := task.RunBackup(ctx, gluetidb.New(), cmdName, &cfg); err != nil {
+				log.Error("failed to backup", zap.Error(err))
+				panic(err)
 			}
 		})
 		if err != nil {
 			log.Error("failed to set cron job", zap.Error(err))
 			return errors.Trace(err)
 		}
+		fmt.Println("Cron job mode:", cfg.Cron)
+		cr.Start()
+		defer cr.Stop()
+		for {
+			time.Sleep(100 * time.Second)
+		}
 	}
+
+	fmt.Println("Common mode:", cfg.Cron)
 	if err := task.RunBackup(GetDefaultContext(), tidbGlue, cmdName, &cfg); err != nil {
 		log.Error("failed to backup", zap.Error(err))
 		return errors.Trace(err)

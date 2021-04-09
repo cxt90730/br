@@ -47,6 +47,7 @@ type Mgr struct {
 	}
 	keepalive   keepalive.ClientParameters
 	ownsStorage bool
+	keepDomain  bool
 }
 
 // StoreBehavior is the action to do in GetAllTiKVStores when a non-TiKV
@@ -268,6 +269,11 @@ func (mgr *Mgr) GetDomain() *domain.Domain {
 	return mgr.dom
 }
 
+// DisableCloseDomain will not close domain
+func (mgr *Mgr) DisableCloseDomain() {
+	mgr.keepDomain = true
+}
+
 // Close closes all client in Mgr.
 func (mgr *Mgr) Close() {
 	mgr.grpcClis.mu.Lock()
@@ -282,7 +288,7 @@ func (mgr *Mgr) Close() {
 	// Gracefully shutdown domain so it does not affect other TiDB DDL.
 	// Must close domain before closing storage, otherwise it gets stuck forever.
 	if mgr.ownsStorage {
-		if mgr.dom != nil {
+		if mgr.dom != nil && !mgr.keepDomain {
 			mgr.dom.Close()
 		}
 
