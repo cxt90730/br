@@ -25,7 +25,7 @@ BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 #The go build still use source code in GOPATH/src/legitlab/yig/
 #keep git source tree clean, better ways to build?
 #I do not know
-make build_internal
+make build
 
 %install
 rm -rf %{buildroot}
@@ -36,7 +36,6 @@ install -D -m 644 package/run_backup.sh %{buildroot}%{_sysconfdir}/br/run_backup
 install -D -m 644 package/run_restore.sh %{buildroot}%{_sysconfdir}/br/run_restore.sh
 install -d %{buildroot}/var/log/br/
 
-#ceph confs ?
 
 %post
 systemctl enable br

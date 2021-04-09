@@ -9,17 +9,8 @@ if [ ! -n "$3" ] ;then
 else
    VER=${3//-/_}
 fi
-echo "Git get full depth..."
-git fetch --unshallow
-if [ ! -n "$4" ] ;then
-   REL=`git rev-parse --short HEAD`git
-   REL=`git log --oneline|wc -l`.$REL
-   REL=$REL
-else
-   REL=`git rev-parse --short HEAD`git
-   REL=`git log --oneline|wc -l`.$REL
-   REL=$4_$REL
-fi
+
+REL=$4
 
 BUILDROOT=$2
 RPMTOPDIR=$GITROOT/$BUILDROOT

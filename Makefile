@@ -14,7 +14,7 @@ LDFLAGS += -X "$(BR_PKG)/pkg/utils.BRGitBranch=$(shell git rev-parse --abbrev-re
 
 REPO = br
 VER = $(shell git describe --tags)
-REL = $(shell git rev-parse --abbrev-ref HEAD)-$(shell git rev-parse HEAD)
+REL = $(shell git rev-parse --abbrev-ref HEAD)_$(shell git rev-parse HEAD)
 BUILDROOT = rpm-build
 
 GOBUILD := GOOS=linux GOARCH=amd64 CGO_ENABLED=0 GO111MODULE=on go build -trimpath -ldflags '$(LDFLAGS)'
@@ -22,6 +22,9 @@ GOBUILD := GOOS=linux GOARCH=amd64 CGO_ENABLED=0 GO111MODULE=on go build -trimpa
 GOTEST  := CGO_ENABLED=1 GO111MODULE=on go test -ldflags '$(LDFLAGS)'
 PREPARE_MOD := cp go.mod1 go.mod && cp go.sum1 go.sum
 FINISH_MOD := cp go.mod go.mod1 && cp go.sum go.sum1
+
+export GO111MODULE=on
+export GOPROXY=https://goproxy.cn
 
 ifeq ("$(WITH_RACE)", "1")
 	RACEFLAG = -race
